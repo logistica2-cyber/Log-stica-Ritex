@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html lang="es" class="h-full">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Casillero Digital de Carga | Logística & Despacho</title>
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- PWA Manifest & Mobile Web App -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#0f172a">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Casillero">
+  <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/2897/2897818.png">
+
+  <!-- Leaflet CSS & JS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  
+  <!-- Custom CSS -->
+  <link rel="stylesheet" href="styles.css">
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#f0f9ff',
+              500: '#0284c7',
+              600: '#0369a1',
+              700: '#075985',
+              900: '#0c4a6e',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <!-- Tesseract.js OCR -->
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+</head>
+<body class="h-full flex flex-col bg-slate-950 text-slate-100 font-sans antialiased select-none">
+
+  <!-- HEADER / BARRA SUPERIOR -->
+  <header class="no-print bg-slate-900 border-b border-slate-800 px-4 sm:px-6 py-2.5 sm:py-3.5 flex flex-wrap items-center justify-between gap-3 z-20">
+    <div class="flex items-center gap-2.5 sm:gap-3">
+      <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-blue-400 flex-shrink-0">
+        <i data-lucide="boxes" class="w-5 h-5 sm:w-6 sm:h-6"></i>
+      </div>
+      <div>
+        <div class="flex items-center gap-2">
+          <h1 class="text-base sm:text-lg font-bold text-white tracking-tight">CASILLERO DIGITAL</h1>
+          <span class="px-2 py-0.5 text-[10px] sm:text-xs font-semibold rounded-full bg-blue-900/60 text-blue-300 border border-blue-700/50">Control de Carga</span>
+        </div>
+        <p class="text-[11px] sm:text-xs text-slate-400 flex items-center gap-1 mt-0.5 truncate max-w-[260px] sm:max-w-none">
+          <i data-lucide="map-pin" class="w-3.5 h-3.5 text-red-400 flex-shrink-0"></i>
+          Base: <span class="text-slate-300 font-medium">Adolfo Alsina 2899, Balvanera (Ricoltex)</span>
+        </p>
+      </div>
+    </div>
+
+    <!-- Acciones Rápidas -->
+    <div class="flex items-center gap-2 flex-wrap">
+      <!-- Input oculto para cámara o archivo de imagen -->
+      <input type="file" id="input-camara-file" accept="image/*" capture="environment" class="hidden">
+
+      <!-- Botón Cámara OCR (Desktop) -->
+      <button id="btn-escanear-camara" class="hidden sm:flex items-center gap-2 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-lg shadow-sm shadow-emerald-900/40 ring-1 ring-emerald-400/60 transition-all">
+        <i data-lucide="camera" class="w-4 h-4"></i>
+        <span>📷 Escanear con Cámara</span>
+      </button>
+
+      <!-- Botón Simulación Factura Real MELFEJ -->
+      <button id="btn-demo-melfej" class="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 sm:py-2 bg-purple-900/50 hover:bg-purple-800/60 text-purple-200 border border-purple-700/60 text-xs font-medium rounded-lg transition-all" title="Simula el escaneo de la factura real de MELFEJ S.R.L.">
+        <i data-lucide="sparkles" class="w-3.5 h-3.5 sm:w-4 sm:h-4 text-purple-400"></i>
+        <span>⚡ Demo MELFEJ</span>
+      </button>
+
+      <button id="btn-nueva-factura" class="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 sm:py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold rounded-lg shadow-sm transition-all">
+        <i data-lucide="plus-circle" class="w-3.5 h-3.5 sm:w-4 sm:h-4"></i>
+        <span>+ Manual</span>
+      </button>
+
+      <button id="btn-exportar" class="hidden md:flex items-center gap-2 px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium rounded-lg border border-slate-700 transition-all" title="Exportar datos a JSON">
+        <i data-lucide="download" class="w-4 h-4"></i>
+        <span>Exportar</span>
+      </button>
+
+      <button id="btn-resetear" class="flex items-center gap-1.5 px-2 sm:px-3 py-1.5 sm:py-2 bg-slate-800 hover:bg-red-900/40 hover:text-red-300 text-slate-400 text-xs font-medium rounded-lg border border-slate-700 transition-all" title="Restaurar datos de prueba">
+        <i data-lucide="rotate-ccw" class="w-3.5 h-3.5 sm:w-4 sm:h-4"></i>
+        <span class="hidden sm:inline">Reiniciar</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- BARRA DE MÉTRICAS GLOBALES -->
+  <section class="global-stats no-print bg-slate-900/70 border-b border-slate-800/80 px-3 sm:px-6 py-2 grid grid-cols-2 sm:grid-cols-5 gap-2 sm:gap-4">
+    <div class="flex items-center gap-2 sm:gap-3">
+      <div class="p-1.5 sm:p-2 rounded-lg bg-slate-800 text-slate-400 flex-shrink-0">
+        <i data-lucide="file-text" class="w-3.5 h-3.5 sm:w-4 sm:h-4"></i>
+      </div>
+      <div>
+        <p class="text-[10px] sm:text-[11px] text-slate-400 uppercase tracking-wider font-medium">Facturas</p>
+        <p id="stat-total-facturas" class="text-sm sm:text-base font-bold text-white leading-tight">0</p>
+      </div>
+    </div>
+
+    <div class="flex items-center gap-2 sm:gap-3">
+      <div class="p-1.5 sm:p-2 rounded-lg bg-blue-900/40 text-blue-400 flex-shrink-0">
+        <i data-lucide="package" class="w-3.5 h-3.5 sm:w-4 sm:h-4"></i>
+      </div>
+      <div>
+        <p class="text-[10px] sm:text-[11px] text-slate-400 uppercase tracking-wider font-medium">Rollos Totales</p>
+        <p id="stat-total-rollos" class="text-sm sm:text-base font-bold text-blue-400 leading-tight">0</p>
+      </div>
+    </div>
+
+    <div class="flex items-center gap-2 sm:gap-3">
+      <div class="p-1.5 sm:p-2 rounded-lg bg-emerald-900/40 text-emerald-400 flex-shrink-0">
+        <i data-lucide="check-circle" class="w-3.5 h-3.5 sm:w-4 sm:h-4"></i>
+      </div>
+      <div>
+        <p class="text-[10px] sm:text-[11px] text-slate-400 uppercase tracking-wider font-medium">En Casillero</p>
+        <p id="stat-rollos-asignados" class="text-sm sm:text-base font-bold text-emerald-400 leading-tight">0</p>
+      </div>
+    </div>
+
+    <div class="flex items-center gap-2 sm:gap-3">
+      <div class="p-1.5 sm:p-2 rounded-lg bg-amber-900/40 text-amber-400 flex-shrink-0">
+        <i data-lucide="clock" class="w-3.5 h-3.5 sm:w-4 sm:h-4"></i>
+      </div>
+      <div>
+        <p class="text-[10px] sm:text-[11px] text-slate-400 uppercase tracking-wider font-medium">Pendientes</p>
+        <p id="stat-rollos-pendientes" class="text-sm sm:text-base font-bold text-amber-400 leading-tight">0</p>
+      </div>
+    </div>
+
+    <div class="hidden sm:flex items-center gap-3">
+      <div class="p-2 rounded-lg bg-purple-900/40 text-purple-400 flex-shrink-0">
+        <i data-lucide="truck" class="w-4 h-4"></i>
+      </div>
+      <div>
+        <p class="text-[11px] text-slate-400 uppercase tracking-wider font-medium">Casilleros Activos</p>
+        <p id="stat-casilleros-activos" class="text-base font-bold text-purple-300 leading-tight">5</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- SELECTOR DE PESTAÑAS PRINCIPALES (ESCRITORIO) -->
+  <nav class="tab-buttons no-print bg-slate-900/90 border-b border-slate-800 px-6 py-2 hidden sm:flex items-center gap-2">
+    <button data-tab="casilleros" class="tab-btn active px-4 py-2 rounded-lg text-xs font-semibold flex items-center gap-2 bg-blue-600 text-white transition-colors">
+      <i data-lucide="layout-grid" class="w-4 h-4"></i>
+      <span>Tablero de Casilleros</span>
+    </button>
+    
+    <button data-tab="mapa" class="tab-btn px-4 py-2 rounded-lg text-xs font-semibold flex items-center gap-2 text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors">
+      <i data-lucide="map" class="w-4 h-4"></i>
+      <span>Mapa de Despacho & Rutas</span>
+    </button>
+    
+    <button data-tab="hoja-ruta" class="tab-btn px-4 py-2 rounded-lg text-xs font-semibold flex items-center gap-2 text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors">
+      <i data-lucide="printer" class="w-4 h-4"></i>
+      <span>Hoja de Ruta Oficial</span>
+    </button>
+  </nav>
+
+  <!-- CONTENEDOR DE VISTAS PRINCIPALES -->
+  <main class="flex-1 overflow-hidden relative pb-16 sm:pb-0">
+
+    <!-- ============================================== -->
+    <!-- VISTA 1: TABLERO DE CASILLEROS (CONTROL CARGA) -->
+    <!-- ============================================== -->
+    <div id="view-casilleros" class="h-full flex flex-col md:flex-row overflow-hidden">
+      
+      <!-- COLUMNA / VISTA: FACTURAS PENDIENTES -->
+      <aside id="panel-pendientes" class="w-full md:w-80 lg:w-96 bg-slate-900/60 border-r border-slate-800 flex flex-col flex-shrink-0 h-full">
+        <div class="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-900/80">
+          <div>
+            <h2 class="text-sm font-bold text-white flex items-center gap-2">
+              <i data-lucide="inbox" class="w-4 h-4 text-amber-400"></i>
+              Facturas Pendientes
+            </h2>
+            <p class="text-[11px] text-slate-400">Arrastra a un casillero o usa asignación rápida</p>
+          </div>
+          <span id="badge-pendientes-count" class="px-2 py-0.5 rounded-full text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+            0 facturas
+          </span>
+        </div>
+
+        <!-- Buscador de Facturas -->
+        <div class="p-3 border-b border-slate-800/80 bg-slate-950/40">
+          <div class="relative">
+            <i data-lucide="search" class="w-3.5 h-3.5 absolute left-3 top-3 text-slate-500"></i>
+            <input type="text" id="search-pendientes" placeholder="Buscar cliente, remito o calle..." class="w-full bg-slate-900 border border-slate-700/80 rounded-lg pl-9 pr-3 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-blue-500">
+          </div>
+        </div>
+
+        <!-- Lista scrolleable de facturas pendientes -->
+        <div id="lista-pendientes" class="flex-1 overflow-y-auto p-3 space-y-2.5" ondragover="handleDragOver(event)" ondrop="handleDrop(event, null)">
+          <!-- Se inyecta dinámicamente -->
+        </div>
+      </aside>
+
+      <!-- ÁREA DERECHA / VISTA: GRID DE CASILLEROS OPERATIVOS POR ZONA -->
+      <section id="panel-casilleros" class="flex-1 overflow-y-auto p-3 sm:p-5 bg-slate-950/80 h-full">
+
+        <!-- CABECERA Y RESUMEN RÁPIDO DE ZONAS -->
+        <div class="mb-4 bg-slate-900/90 border border-slate-800 rounded-2xl p-4 shadow-lg">
+          <div class="flex flex-wrap items-center justify-between gap-3 mb-3">
+            <div>
+              <h2 class="text-sm font-bold text-white flex items-center gap-2">
+                <i data-lucide="bar-chart-3" class="w-4 h-4 text-emerald-400"></i>
+                Resumen Ejecutivo de Carga por Zona (9 Casilleros)
+              </h2>
+              <p class="text-[11px] text-slate-400">Consulta rápida de facturas y rollos por cada zona operativa.</p>
+            </div>
+            <div class="flex items-center gap-2 text-[11px] text-slate-400">
+              <span class="inline-block w-2.5 h-2.5 rounded-full bg-emerald-500"></span> Seguro
+              <span class="inline-block w-2.5 h-2.5 rounded-full bg-amber-500 ml-2"></span> Alerta
+              <span class="inline-block w-2.5 h-2.5 rounded-full bg-red-500 ml-2"></span> Sobrecarga
+            </div>
+          </div>
+
+          <!-- TABLA RESUMEN CONSOLIDADA DE ZONAS -->
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs border-collapse">
+              <thead>
+                <tr class="border-b border-slate-800 text-[11px] uppercase tracking-wider text-slate-400 bg-slate-950/60">
+                  <th class="p-2 font-bold">Zona / Casillero</th>
+                  <th class="p-2 font-bold text-center">Facturas</th>
+                  <th class="p-2 font-bold text-center">Rollos Actuales</th>
+                  <th class="p-2 font-bold text-center">Cap. Máx</th>
+                  <th class="p-2 font-bold">Ocupación Camión</th>
+                  <th class="p-2 font-bold text-center">Estado</th>
+                  <th class="p-2 text-right font-bold">Acción</th>
+                </tr>
+              </thead>
+              <tbody id="tabla-resumen-zonas" class="divide-y divide-slate-800/60">
+                <!-- Se inyecta dinámicamente -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <h3 class="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+            <i data-lucide="truck" class="w-4 h-4 text-blue-400"></i>
+            Casilleros Operativos (Arrastrar y Soltar Facturas)
+          </h3>
+          <div class="flex items-center gap-2 text-xs">
+            <label class="text-slate-400 font-medium flex items-center gap-1">
+              <i data-lucide="arrow-down-up" class="w-3.5 h-3.5 text-blue-400"></i> Ordenar:
+            </label>
+            <select id="select-orden-casilleros" class="bg-slate-800 border border-slate-700 text-slate-200 text-xs rounded-lg px-2.5 py-1 focus:outline-none focus:border-blue-500">
+              <option value="rollos_desc" selected>📊 Mayor cantidad de rollos</option>
+              <option value="rollos_asc">📉 Menor cantidad de rollos</option>
+              <option value="alfabetico">🔤 Alfabético (A - Z)</option>
+              <option value="defecto">📌 Orden original</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Contenedor Grid de Casilleros -->
+        <div id="grid-casilleros" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          <!-- Tarjetas de casilleros inyectadas dinámicamente -->
+        </div>
+      </section>
+
+    </div>
+
+    <!-- ============================================== -->
+    <!-- VISTA 2: MAPA DE DESPACHO & RUTAS              -->
+    <!-- ============================================== -->
+    <div id="view-mapa" class="h-full hidden flex flex-col md:flex-row overflow-hidden">
+      <!-- Barra lateral de paradas en el mapa -->
+      <aside class="w-full md:w-96 bg-slate-900 border-r border-slate-800 flex flex-col overflow-hidden flex-shrink-0">
+        <div class="p-4 border-b border-slate-800 bg-slate-900/90">
+          <label class="text-xs font-bold text-slate-300 uppercase tracking-wider block mb-1.5">Filtrar por Casillero / Zona:</label>
+          <select id="map-zone-filter" class="w-full bg-slate-800 border border-slate-700 text-xs rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500">
+            <option value="ALL">Todas las Zonas</option>
+            <!-- Opciones inyectadas -->
+          </select>
+        </div>
+
+        <div class="p-3 bg-slate-950/50 border-b border-slate-800 text-xs flex justify-between items-center text-slate-400">
+          <span>Depósito Central:</span>
+          <span class="font-bold text-red-400 flex items-center gap-1">
+            <i data-lucide="warehouse" class="w-3.5 h-3.5"></i> Alsina 2899
+          </span>
+        </div>
+
+        <!-- Resumen de Ruta por Calles & Botón Google Maps GPS -->
+        <div id="map-route-summary" class="p-3 bg-slate-950/90 border-b border-slate-800 space-y-2">
+          <div class="flex items-center justify-between text-xs">
+            <span class="text-slate-400 font-medium flex items-center gap-1">
+              <i data-lucide="milestone" class="w-3.5 h-3.5 text-blue-400"></i>
+              <span>Ruta por calles:</span>
+            </span>
+            <div class="flex items-center gap-1.5 font-mono">
+              <span id="map-route-km" class="text-emerald-400 font-bold bg-emerald-950/70 border border-emerald-800/60 px-2 py-0.5 rounded text-[11px]">-- km</span>
+              <span id="map-route-time" class="text-blue-400 font-bold bg-blue-950/70 border border-blue-800/60 px-2 py-0.5 rounded text-[11px]">-- min</span>
+            </div>
+          </div>
+          
+          <a id="btn-google-maps-nav" href="#" target="_blank" class="w-full py-2 px-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-lg transition-all">
+            <i data-lucide="navigation" class="w-4 h-4 text-white"></i>
+            <span>Abrir en Google Maps GPS</span>
+            <i data-lucide="external-link" class="w-3 h-3 opacity-70"></i>
+          </a>
+        </div>
+
+        <!-- Lista de paradas ordenadas de la zona activa -->
+        <div id="map-stops-list" class="flex-1 overflow-y-auto p-3 space-y-2">
+          <!-- Paradas inyectadas -->
+        </div>
+      </aside>
+
+      <!-- Mapa Leaflet interactivo -->
+      <div class="flex-1 h-full relative" id="map-container">
+        <div id="map" class="w-full h-full"></div>
+      </div>
+    </div>
+
+    <!-- ============================================== -->
+    <!-- VISTA 3: HOJA DE RUTA OFICIAL (PRINT / PDF)   -->
+    <!-- ============================================== -->
+    <div id="view-hoja-ruta" class="h-full hidden flex flex-col overflow-y-auto p-6 bg-slate-950">
+      <div class="no-print max-w-4xl mx-auto w-full mb-4 flex flex-wrap items-center justify-between gap-3 bg-slate-900 p-4 rounded-xl border border-slate-800">
+        <div class="flex items-center gap-3">
+          <label class="text-xs font-semibold text-slate-300">Seleccionar Casillero / Zona:</label>
+          <select id="select-hoja-zona" class="bg-slate-800 border border-slate-700 text-xs rounded-lg px-3 py-1.5 text-white focus:outline-none focus:border-blue-500">
+            <!-- Inyectado dinámicamente -->
+          </select>
+        </div>
+
+        <button onclick="window.print()" class="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-lg shadow transition-all">
+          <i data-lucide="printer" class="w-4 h-4"></i>
+          <span>Imprimir / Guardar en PDF</span>
+        </button>
+      </div>
+
+      <!-- DOCUMENTO HOJA DE RUTA (Optimizada para impresión A4) -->
+      <div id="hoja-ruta-print-area" class="max-w-4xl mx-auto w-full bg-white text-slate-900 rounded-xl shadow-2xl p-8 print-document border border-slate-200">
+        
+        <!-- Header del documento -->
+        <div class="flex justify-between items-start border-b-2 border-slate-900 pb-4 mb-6">
+          <div>
+            <h2 class="text-2xl font-black tracking-tight text-slate-900">HOJA DE RUTA & DESPACHO</h2>
+            <p class="text-xs text-slate-600 uppercase font-semibold tracking-wider mt-0.5">Control de Carga y Secuencia de Entregas</p>
+            <p class="text-xs text-slate-700 mt-2">
+              <strong>Origen:</strong> Depósito Central Alsina - Adolfo Alsina 2899, Balvanera, CABA
+            </p>
+          </div>
+          <div class="text-right">
+            <div id="hdr-codigo" class="text-sm font-mono font-bold text-slate-800 bg-slate-100 px-3 py-1 rounded border border-slate-300 inline-block mb-1">
+              HDR-2026-001
+            </div>
+            <p id="hdr-fecha" class="text-xs text-slate-600 font-medium">Fecha: 03/09/2026</p>
+            <p id="hdr-zona-badge" class="text-xs font-bold text-blue-700 uppercase mt-1">Zona: CABA NORTE</p>
+          </div>
+        </div>
+
+        <!-- Ficha del Vehículo / Chofer -->
+        <div class="grid grid-cols-3 gap-3 bg-slate-50 p-3 rounded-lg border border-slate-200 text-xs mb-6">
+          <div>
+            <span class="text-slate-500 block">Chofer / Móvil:</span>
+            <strong id="hdr-chofer" class="text-slate-900 text-sm">Carlos Méndez (Móvil 04)</strong>
+          </div>
+          <div>
+            <span class="text-slate-500 block">Total Paradas:</span>
+            <strong id="hdr-total-paradas" class="text-slate-900 text-sm">0 clientes</strong>
+          </div>
+          <div>
+            <span class="text-slate-500 block">Carga Total:</span>
+            <strong id="hdr-total-rollos" class="text-blue-700 text-sm font-mono">0 ROLLOS</strong>
+          </div>
+        </div>
+
+        <!-- Tabla de entregas ordenada por Secuencia_Entrega -->
+        <table class="w-full text-xs text-left border-collapse mb-8">
+          <thead>
+            <tr class="bg-slate-100 text-slate-800 border-b border-slate-300">
+              <th class="p-2 text-center font-bold w-12">Sec.</th>
+              <th class="p-2 font-bold w-24">Remito / FC</th>
+              <th class="p-2 font-bold">Cliente</th>
+              <th class="p-2 font-bold">Dirección de Entrega</th>
+              <th class="p-2 text-center font-bold w-16">Rollos</th>
+              <th class="p-2 font-bold w-28">Horario / Obs.</th>
+              <th class="p-2 text-center font-bold w-36">Firma / Sello</th>
+            </tr>
+          </thead>
+          <tbody id="hdr-tbody" class="divide-y divide-slate-200">
+            <!-- Filas inyectadas -->
+          </tbody>
+        </table>
+
+        <!-- Firmas de salida y recepción -->
+        <div class="grid grid-cols-2 gap-12 pt-8 mt-4 border-t border-slate-300 text-center text-xs">
+          <div>
+            <div class="h-14 border-b border-dashed border-slate-400"></div>
+            <p class="font-bold text-slate-800 mt-1">Firma y Sello - Despacho Alsina 2899</p>
+            <p class="text-[10px] text-slate-500">Conformidad de bultos cargados</p>
+          </div>
+          <div>
+            <div class="h-14 border-b border-dashed border-slate-400"></div>
+            <p class="font-bold text-slate-800 mt-1">Firma Chofer Receptor</p>
+            <p class="text-[10px] text-slate-500">Aceptación de carga y hoja de ruta</p>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+  </main>
+
+  <!-- ==================================================== -->
+  <!-- BARRA DE NAVEGACIÓN INFERIOR PARA CELULARES          -->
+  <!-- ==================================================== -->
+  <nav class="sm:hidden fixed bottom-0 left-0 right-0 z-40 bg-slate-900/95 backdrop-blur-md border-t border-slate-800 px-3 py-1 flex items-center justify-around shadow-2xl safe-bottom no-print">
+    <button data-tab="casilleros" class="tab-btn-mobile flex flex-col items-center justify-center py-1 px-2 text-blue-400 font-bold transition-all">
+      <i data-lucide="layout-grid" class="w-5 h-5 mb-0.5"></i>
+      <span class="text-[10px]">Casilleros</span>
+    </button>
+
+    <button data-tab="pendientes" class="tab-btn-mobile relative flex flex-col items-center justify-center py-1 px-2 text-slate-400 hover:text-slate-200 transition-all">
+      <div class="relative">
+        <i data-lucide="inbox" class="w-5 h-5 mb-0.5"></i>
+        <span id="badge-pendientes-mobile" class="absolute -top-1 -right-2 px-1.5 py-0.2 bg-amber-500 text-slate-950 rounded-full text-[9px] font-black min-w-[15px] text-center">0</span>
+      </div>
+      <span class="text-[10px]">Pendientes</span>
+    </button>
+
+    <!-- Botón Central Flotante de Cámara OCR -->
+    <button id="btn-camara-mobile" class="flex flex-col items-center justify-center -mt-5 bg-gradient-to-tr from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white w-12 h-12 rounded-full shadow-lg shadow-emerald-950/80 ring-4 ring-slate-950 active:scale-90 transition-all" title="Escanear con Cámara">
+      <i data-lucide="camera" class="w-6 h-6"></i>
+    </button>
+
+    <button data-tab="mapa" class="tab-btn-mobile flex flex-col items-center justify-center py-1 px-2 text-slate-400 hover:text-slate-200 transition-all">
+      <i data-lucide="map" class="w-5 h-5 mb-0.5"></i>
+      <span class="text-[10px]">Mapa</span>
+    </button>
+
+    <button data-tab="hoja-ruta" class="tab-btn-mobile flex flex-col items-center justify-center py-1 px-2 text-slate-400 hover:text-slate-200 transition-all">
+      <i data-lucide="printer" class="w-5 h-5 mb-0.5"></i>
+      <span class="text-[10px]">Hojas Ruta</span>
+    </button>
+  </nav>
+
+  <!-- ============================================== -->
+  <!-- MODAL: AGREGAR NUEVA FACTURA                  -->
+  <!-- ============================================== -->
+  <div id="modal-factura" class="no-print fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-3 sm:p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-4 sm:p-6 shadow-2xl max-h-[92vh] overflow-y-auto">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-800 mb-4">
+        <h3 class="text-sm font-bold text-white flex items-center gap-2">
+          <i data-lucide="file-plus" class="w-4 h-4 text-blue-400"></i>
+          Nueva Factura de Entrega
+        </h3>
+        <button id="btn-cerrar-modal" class="text-slate-400 hover:text-white">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <form id="form-factura" class="space-y-3.5 text-xs">
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-slate-300 font-medium mb-1">N° Remito / Factura *</label>
+            <input type="text" id="input-remito" required placeholder="Ej: R-8415" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500">
+          </div>
+          <div>
+            <label class="block text-slate-300 font-medium mb-1">Cantidad de Rollos *</label>
+            <input type="number" id="input-rollos" required min="1" max="500" placeholder="Ej: 35" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500">
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-slate-300 font-medium mb-1 flex items-center justify-between">
+            <span>Nombre del Cliente *</span>
+            <span class="text-[10px] text-emerald-400 font-normal flex items-center gap-1">
+              <i data-lucide="zap" class="w-3 h-3"></i> Autocompleta Zona y Dirección
+            </span>
+          </label>
+          <input type="text" id="input-cliente" list="datalist-clientes" required placeholder="Escribe para buscar (ej: MELFEJ, PRINTEL, TOUBY...)" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500 font-semibold" autocomplete="off">
+          <datalist id="datalist-clientes">
+            <!-- Se puebla dinámicamente con los 300+ clientes -->
+          </datalist>
+        </div>
+
+        <div>
+          <label class="block text-slate-300 font-medium mb-1">Dirección de Entrega (Autocompletada o Personalizada) *</label>
+          <input type="text" id="input-direccion" required placeholder="Se autocompleta con el cliente o zona" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500">
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-slate-300 font-medium mb-1">Casillero / Zona</label>
+            <select id="input-zona" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500">
+              <option value="">-- Autodetectar por Maestro de Clientes --</option>
+              <option value="SUROESTE">Suroeste</option>
+              <option value="SUR_EXPRESOS">Sur Expresos (Interior)</option>
+              <option value="SUR_SUR">Sur / Sur</option>
+              <option value="AVELLANEDA">Avellaneda</option>
+              <option value="CANNING">Canning</option>
+              <option value="NORTE">Norte</option>
+              <option value="NOROESTE">Noroeste</option>
+              <option value="OESTE">Oeste</option>
+              <option value="ONCE">Once & Balvanera</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-slate-300 font-medium mb-1">Horario Preferido</label>
+            <input type="text" id="input-horario" placeholder="Ej: 09:00 - 13:00" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500">
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-slate-300 font-medium mb-1">Observaciones de Descarga</label>
+          <input type="text" id="input-observaciones" placeholder="Ej: Descargar en subsuelo, pedir por Martín" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500">
+        </div>
+
+        <div class="pt-3 border-t border-slate-800 flex justify-end gap-2">
+          <button type="button" id="btn-cancelar-modal" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg transition-colors">
+            Cancelar
+          </button>
+          <button type="submit" class="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-lg transition-colors">
+            Guardar Factura
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ============================================== -->
+  <!-- MODAL: ESCÁNER OCR CON CÁMARA / FOTO          -->
+  <!-- ============================================== -->
+  <div id="modal-ocr" class="no-print fixed inset-0 bg-black/80 backdrop-blur-md z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-700 rounded-2xl max-w-lg w-full p-6 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+      
+      <!-- Cabecera del Escáner -->
+      <div class="flex items-center justify-between pb-3 border-b border-slate-800 mb-4">
+        <div class="flex items-center gap-2.5">
+          <div class="w-8 h-8 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
+            <i data-lucide="scan-line" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <h3 class="text-sm font-bold text-white">Escáner OCR Inteligente</h3>
+            <p class="text-[11px] text-slate-400">Reconocimiento automático de Factura, Bultos y Zona</p>
+          </div>
+        </div>
+        <button id="btn-cerrar-ocr" class="text-slate-400 hover:text-white">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <!-- Estado de procesamiento / Previsualización -->
+      <div class="space-y-4 overflow-y-auto pr-1 flex-1">
+        
+        <!-- Indicador de carga / barra de progreso OCR -->
+        <div id="ocr-loading" class="p-4 rounded-xl bg-slate-950 border border-slate-800 flex flex-col items-center justify-center text-center py-8">
+          <div class="w-10 h-10 border-4 border-emerald-500/30 border-t-emerald-500 rounded-full animate-spin mb-3"></div>
+          <p class="text-xs font-bold text-slate-200">Leyendo documento con OCR...</p>
+          <p class="text-[11px] text-slate-400 mt-1" id="ocr-status-text">Buscando cliente, bultos y código de factura</p>
+        </div>
+
+        <!-- Resultados de la lectura -->
+        <div id="ocr-results" class="hidden space-y-3">
+          
+          <!-- Imagen analizada -->
+          <div class="relative rounded-xl overflow-hidden max-h-48 border border-slate-800 bg-slate-950 flex items-center justify-center">
+            <img id="ocr-preview-img" class="object-contain max-h-48 w-full" src="" alt="Factura escaneada">
+            <span class="absolute top-2 right-2 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500 text-slate-950 flex items-center gap-1 shadow">
+              <i data-lucide="check" class="w-3 h-3"></i> Leído con éxito
+            </span>
+          </div>
+
+          <!-- Tarjeta de datos extraídos con campos de verificación rápida -->
+          <div class="bg-slate-950/90 p-3.5 rounded-xl border border-slate-800 text-xs space-y-3">
+            <div class="grid grid-cols-2 gap-2.5">
+              <div>
+                <label class="text-[11px] text-slate-400 font-medium block mb-1">N° Factura / Remito:</label>
+                <input type="text" id="ocr-res-factura" class="w-full bg-slate-900 border border-slate-700 text-white font-mono font-bold rounded-lg px-2.5 py-1.5 focus:border-blue-500 focus:outline-none text-xs" placeholder="00201-00000790">
+              </div>
+              <div>
+                <label class="text-[11px] text-slate-400 font-medium block mb-1">Cantidad de Rollos / Bultos:</label>
+                <input type="number" id="ocr-res-rollos" class="w-full bg-slate-900 border border-slate-700 text-emerald-400 font-mono font-bold rounded-lg px-2.5 py-1.5 focus:border-blue-500 focus:outline-none text-xs" placeholder="39">
+              </div>
+            </div>
+
+            <div>
+              <label class="text-[11px] text-slate-400 font-medium block mb-1 flex items-center justify-between">
+                <span>Cliente detectado:</span>
+                <span class="text-[10px] text-emerald-400 font-normal">Maestro de Clientes</span>
+              </label>
+              <input type="text" id="ocr-res-cliente" list="datalist-clientes" class="w-full bg-slate-900 border border-slate-700 text-white font-bold rounded-lg px-2.5 py-1.5 focus:border-blue-500 focus:outline-none text-xs" placeholder="MELFEJ S.R.L.">
+            </div>
+
+            <div>
+              <label class="text-[11px] text-slate-400 font-medium block mb-1">Casillero / Zona asignada:</label>
+              <select id="ocr-res-zona" class="w-full bg-slate-900 border border-slate-700 text-blue-300 font-bold rounded-lg px-2.5 py-1.5 focus:border-blue-500 focus:outline-none text-xs">
+                <option value="SUROESTE">Suroeste</option>
+                <option value="SUR_EXPRESOS">Sur Expresos (Interior)</option>
+                <option value="SUR_SUR">Sur / Sur</option>
+                <option value="AVELLANEDA">Avellaneda</option>
+                <option value="CANNING">Canning</option>
+                <option value="NORTE">Norte</option>
+                <option value="NOROESTE">Noroeste</option>
+                <option value="OESTE">Oeste</option>
+                <option value="ONCE">Once & Balvanera</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Mensaje de acción -->
+          <div class="p-3 bg-blue-950/40 border border-blue-800/60 rounded-xl text-xs text-blue-300 flex items-center gap-2">
+            <i data-lucide="arrow-right-circle" class="w-5 h-5 flex-shrink-0 text-blue-400"></i>
+            <span>La factura se ubicará en el <strong>Casillero Suroeste</strong> y sumará <strong>39 rollos</strong> a la capacidad del móvil.</span>
+          </div>
+
+        </div>
+
+      </div>
+
+      <!-- Botones del Modal OCR -->
+      <div class="pt-4 mt-4 border-t border-slate-800 flex justify-end gap-2">
+        <button type="button" id="btn-cancelar-ocr" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-medium transition-colors">
+          Cancelar
+        </button>
+        <button type="button" id="btn-confirmar-ocr" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold transition-colors flex items-center gap-2">
+          <i data-lucide="check" class="w-4 h-4"></i>
+          <span>Asignar a Casillero</span>
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="clientesMaestro.js"></script>
+  <script src="mockData.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
